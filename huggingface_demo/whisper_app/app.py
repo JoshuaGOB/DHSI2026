@@ -23,6 +23,7 @@ def _ensure_offline(cache_dir: Path = None) -> None:
 
 
 CHUNK_SECONDS = 30
+LIVE_CHUNK_SECONDS = 10
 
 
 class AudioRecorder:
@@ -42,12 +43,11 @@ class AudioRecorder:
         )
         self._stream.start()
 
-    def stop(self) -> str:
+    def stop(self) -> None:
         if self._stream:
             self._stream.stop()
             self._stream.close()
             self._stream = None
-        return self._save_wav()
 
     def _callback(self, indata, frames, time, status):
         with self._lock:
@@ -130,9 +130,9 @@ class App(tk.Tk):
             self._set_error(str(e))
 
     def _on_stop(self):
-        self._set_state("idle")  # disable all buttons while WAV is being written
+        self._set_state("idle")
         try:
-            self._wav_path = self._recorder.stop()
+            self._recorder.stop()
             self._set_state("stopped")
         except Exception as e:
             self._set_error(str(e))
