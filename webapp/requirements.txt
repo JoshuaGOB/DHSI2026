@@ -2,7 +2,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 python-dotenv>=1.0
 pyzotero>=1.5
-chromadb>=1.0
+chromadb==1.5.9
 pypdf>=5.0
 langchain-core>=0.3
 langchain-community>=0.3
