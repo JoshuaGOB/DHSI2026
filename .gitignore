@@ -16,3 +16,10 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# webapp
+webapp/.venv/
+webapp/data/
+webapp/.env
+__pycache__/
+*.pyc

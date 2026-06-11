@@ -1,0 +1,11 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+pyzotero>=1.5
+chromadb>=1.0
+pypdf>=5.0
+langchain-core>=0.3
+langchain-community>=0.3
+langchain-text-splitters>=0.3
+langchain-openai>=0.3
+langchain-anthropic>=0.3
