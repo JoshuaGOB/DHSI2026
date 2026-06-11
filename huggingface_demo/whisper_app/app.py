@@ -3,7 +3,7 @@ from pathlib import Path
 import threading
 import tempfile
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, filedialog
 
 import numpy as np
 import sounddevice as sd
@@ -109,6 +109,21 @@ class App(tk.Tk):
         )
         self._text.pack(padx=16, pady=(0, 16))
 
+        action_row = tk.Frame(self)
+        action_row.pack(pady=(0, 16))
+
+        self._btn_clear = tk.Button(
+            action_row, text="Clear", width=10, command=self._on_clear,
+            bg="#9E9E9E", fg="white", font=("Helvetica", 13),
+        )
+        self._btn_clear.pack(side=tk.LEFT, padx=4)
+
+        self._btn_save = tk.Button(
+            action_row, text="Save File", width=10, command=self._on_save,
+            bg="#2196F3", fg="white", font=("Helvetica", 13),
+        )
+        self._btn_save.pack(side=tk.LEFT, padx=4)
+
         self._set_state("idle")
 
     # ── button handlers ───────────────────────────────────────────────────────
@@ -179,6 +194,22 @@ class App(tk.Tk):
         ):
             btn.config(state=tk.NORMAL if enabled else tk.DISABLED, bg=bg)
         self._status.config(text=label, fg=fg)
+
+    def _on_clear(self):
+        self._text.config(state=tk.NORMAL)
+        self._text.delete("1.0", tk.END)
+        self._text.config(state=tk.DISABLED)
+
+    def _on_save(self):
+        path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        content = self._text.get("1.0", tk.END)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
 
     def _append_text(self, text: str):
         self._text.config(state=tk.NORMAL)
