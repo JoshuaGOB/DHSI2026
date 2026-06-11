@@ -75,3 +75,43 @@ def index_paper(paper: dict, settings: Settings, chroma_client, embeddings) -> i
             embeddings=vectors,
         )
     return len(chunks)
+
+
+def run_ingest_job(
+    job_id: str, collection_id: str, settings: Settings, *,
+    zotero=None, chroma_client=None, embeddings=None,
+) -> None:
+    """Fetch a collection's papers and index each one. Designed to run as a
+    FastAPI background task; all outcomes land in SQLite, never raised."""
+    zotero = zotero or ZoteroClient(settings.zotero_user_id, settings.zotero_api_key)
+    try:
+        chroma_client = chroma_client or get_chroma_client(settings)
+        embeddings = embeddings or get_embeddings(settings)
+        papers = zotero.fetch_collection_papers(collection_id, settings.pdf_dir)
+    except Exception as exc:
+        db.finish_job(settings.db_path, job_id, "failed", error=str(exc))
+        return
+
+    for paper in papers:
+        db.upsert_paper(settings.db_path, paper)
+        existing = db.get_paper(settings.db_path, paper["zotero_key"])
+        if not should_reingest(existing, settings):
+            continue
+        if not paper["pdf_path"]:
+            db.set_ingest_result(
+                settings.db_path, paper["zotero_key"], "skipped",
+                error=paper.get("pdf_error") or "No PDF attachment",
+            )
+            continue
+        try:
+            count = index_paper(paper, settings, chroma_client, embeddings)
+        except Exception as exc:
+            db.set_ingest_result(
+                settings.db_path, paper["zotero_key"], "failed", error=str(exc)
+            )
+            continue
+        db.set_ingest_result(
+            settings.db_path, paper["zotero_key"], "indexed",
+            chunk_count=count, embedding_model=settings.embedding_model,
+        )
+    db.finish_job(settings.db_path, job_id, "done")

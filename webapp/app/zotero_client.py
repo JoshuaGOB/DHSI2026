@@ -47,8 +47,11 @@ class ZoteroClient:
             attachment_key = self._find_pdf_attachment(item["key"])
             if attachment_key:
                 filename = f"{item['key']}.pdf"
-                self.zot.dump(attachment_key, filename, str(pdf_dir))
-                paper["pdf_path"] = str(pdf_dir / filename)
+                try:
+                    self.zot.dump(attachment_key, filename, str(pdf_dir))
+                    paper["pdf_path"] = str(pdf_dir / filename)
+                except Exception as exc:
+                    paper["pdf_error"] = f"PDF download failed: {exc}"
             papers.append(paper)
         return papers
 

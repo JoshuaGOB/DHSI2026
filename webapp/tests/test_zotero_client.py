@@ -91,3 +91,20 @@ def test_format_authors_handles_orgs_and_multiple():
         {"lastName": "Turing"},
     ]
     assert _format_authors(creators) == "Ada Lovelace, The Royal Society, Turing"
+
+
+def test_fetch_paper_download_failure_is_per_paper(tmp_path):
+    zot = MagicMock()
+    zot.collection_items_top.return_value = [
+        make_item("AAA", "Broken Download"),
+        make_item("BBB", "Fine Paper"),
+    ]
+    zot.children.return_value = [make_pdf_attachment("ATT1")]
+    zot.dump.side_effect = [RuntimeError("403 forbidden"), None]
+    client = ZoteroClient("123", "key", zot=zot)
+
+    papers = client.fetch_collection_papers("C1", tmp_path / "pdfs")
+
+    assert papers[0]["pdf_path"] is None
+    assert "403 forbidden" in papers[0]["pdf_error"]
+    assert papers[1]["pdf_path"] == str(tmp_path / "pdfs" / "BBB.pdf")
