@@ -22,6 +22,9 @@ def _ensure_offline(cache_dir: Path = None) -> None:
         os.environ["HF_HUB_OFFLINE"] = "1"
 
 
+CHUNK_SECONDS = 30
+
+
 class AudioRecorder:
     def __init__(self, sample_rate: int = 16000):
         self.sample_rate = sample_rate
@@ -62,13 +65,14 @@ class AudioRecorder:
 class WhisperTranscriber:
     MODEL = "mlx-community/whisper-large-v3-turbo"
 
-    def transcribe(self, wav_path: str) -> str:
-        try:
-            result = mlx_whisper.transcribe(wav_path, path_or_hf_repo=self.MODEL)
-            return result.get("text", "").strip()
-        finally:
-            if os.path.exists(wav_path):
-                os.unlink(wav_path)
+    def transcribe_segments(self, audio: np.ndarray, sample_rate: int = 16000):
+        chunk_size = CHUNK_SECONDS * sample_rate
+        for start in range(0, len(audio), chunk_size):
+            chunk = audio[start : start + chunk_size].astype(np.float32)
+            result = mlx_whisper.transcribe(chunk, path_or_hf_repo=self.MODEL)
+            text = result.get("text", "").strip()
+            if text:
+                yield text
 
 
 class App(tk.Tk):
