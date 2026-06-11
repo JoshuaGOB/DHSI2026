@@ -125,37 +125,41 @@ class App(tk.Tk):
     def _on_stop(self):
         self._set_state("finalizing")
         self._recorder.stop()
-        self._live_stop.set()
+        if self._live_stop:
+            self._live_stop.set()
 
     def _live_loop(self, stop_event: threading.Event):
-        chunk_samples = LIVE_CHUNK_SECONDS * self._recorder.sample_rate
-        processed = 0
-        while not stop_event.is_set():
+        try:
+            chunk_samples = LIVE_CHUNK_SECONDS * self._recorder.sample_rate
+            processed = 0
+            while not stop_event.is_set():
+                with self._recorder._lock:
+                    all_audio = (
+                        np.concatenate(self._recorder._buffer)
+                        if self._recorder._buffer
+                        else np.zeros(0, dtype=np.float32)
+                    )
+                if len(all_audio) - processed >= chunk_samples:
+                    chunk = all_audio[processed : processed + chunk_samples].astype(np.float32)
+                    processed += chunk_samples
+                    for text in self._transcriber.transcribe_segments(chunk, self._recorder.sample_rate):
+                        self.after(0, self._append_text, text)
+                else:
+                    stop_event.wait(timeout=0.5)
+            # Transcribe tail after stop
             with self._recorder._lock:
                 all_audio = (
                     np.concatenate(self._recorder._buffer)
                     if self._recorder._buffer
                     else np.zeros(0, dtype=np.float32)
                 )
-            if len(all_audio) - processed >= chunk_samples:
-                chunk = all_audio[processed : processed + chunk_samples].astype(np.float32)
-                processed += chunk_samples
-                for text in self._transcriber.transcribe_segments(chunk, self._recorder.sample_rate):
+            remaining = all_audio[processed:].astype(np.float32)
+            if len(remaining) / self._recorder.sample_rate >= 0.5:
+                for text in self._transcriber.transcribe_segments(remaining, self._recorder.sample_rate):
                     self.after(0, self._append_text, text)
-            else:
-                stop_event.wait(timeout=0.5)
-        # Transcribe tail after stop
-        with self._recorder._lock:
-            all_audio = (
-                np.concatenate(self._recorder._buffer)
-                if self._recorder._buffer
-                else np.zeros(0, dtype=np.float32)
-            )
-        remaining = all_audio[processed:].astype(np.float32)
-        if len(remaining) / self._recorder.sample_rate >= 0.5:
-            for text in self._transcriber.transcribe_segments(remaining, self._recorder.sample_rate):
-                self.after(0, self._append_text, text)
-        self.after(0, self._set_state, "done")
+            self.after(0, self._set_state, "done")
+        except Exception as e:
+            self.after(0, self._set_error, str(e))
 
     # ── GUI helpers ───────────────────────────────────────────────────────────
 
