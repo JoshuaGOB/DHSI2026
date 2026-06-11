@@ -5,6 +5,7 @@ import tempfile
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
+import mlx_whisper
 
 
 class AudioRecorder:
@@ -42,3 +43,15 @@ class AudioRecorder:
         os.close(fd)
         sf.write(path, audio, self.sample_rate)
         return path
+
+
+class WhisperTranscriber:
+    MODEL = "mlx-community/whisper-large-v3-turbo"
+
+    def transcribe(self, wav_path: str) -> str:
+        try:
+            result = mlx_whisper.transcribe(wav_path, path_or_hf_repo=self.MODEL)
+            return result.get("text", "").strip()
+        finally:
+            if os.path.exists(wav_path):
+                os.unlink(wav_path)
