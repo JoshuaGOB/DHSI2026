@@ -1,13 +1,11 @@
 import os
 from pathlib import Path
 import threading
-import tempfile
 import tkinter as tk
 from tkinter import scrolledtext, filedialog
 
 import numpy as np
 import sounddevice as sd
-import soundfile as sf
 import mlx_whisper
 
 
@@ -52,14 +50,6 @@ class AudioRecorder:
     def _callback(self, indata, frames, time, status):
         with self._lock:
             self._buffer.append(indata.copy().flatten())
-
-    def _save_wav(self) -> str:
-        with self._lock:
-            audio = np.concatenate(self._buffer) if self._buffer else np.zeros((1,), dtype=np.float32)
-        fd, path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)
-        sf.write(path, audio, self.sample_rate)
-        return path
 
 
 class WhisperTranscriber:
@@ -139,9 +129,9 @@ class App(tk.Tk):
 
     def _on_stop(self):
         self._set_state("finalizing")
-        self._recorder.stop()
         if self._live_stop:
             self._live_stop.set()
+        self._recorder.stop()
 
     def _live_loop(self, stop_event: threading.Event):
         try:
