@@ -12,6 +12,7 @@ class AudioRecorder:
         self.sample_rate = sample_rate
         self._buffer: list[np.ndarray] = []
         self._stream = None
+        self._lock = threading.Lock()
 
     def start(self):
         self._buffer = []
@@ -31,10 +32,13 @@ class AudioRecorder:
         return self._save_wav()
 
     def _callback(self, indata, frames, time, status):
-        self._buffer.append(indata.copy().flatten())
+        with self._lock:
+            self._buffer.append(indata.copy().flatten())
 
     def _save_wav(self) -> str:
-        audio = np.concatenate(self._buffer) if self._buffer else np.zeros((1,), dtype=np.float32)
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        sf.write(tmp.name, audio, self.sample_rate)
-        return tmp.name
+        with self._lock:
+            audio = np.concatenate(self._buffer) if self._buffer else np.zeros((1,), dtype=np.float32)
+        fd, path = tempfile.mkstemp(suffix=".wav")
+        os.close(fd)
+        sf.write(path, audio, self.sample_rate)
+        return path
