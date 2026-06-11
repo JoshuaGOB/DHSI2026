@@ -83,7 +83,7 @@ class App(tk.Tk):
 
         self._recorder = AudioRecorder()
         self._transcriber = WhisperTranscriber()
-        self._wav_path: str | None = None
+        self._live_stop: threading.Event | None = None
 
         btn_row = tk.Frame(self)
         btn_row.pack(pady=(16, 8), padx=24)
@@ -100,12 +100,6 @@ class App(tk.Tk):
         )
         self._btn_stop.pack(side=tk.LEFT, padx=4)
 
-        self._btn_transcribe = tk.Button(
-            btn_row, text="Transcribe", width=10, command=self._on_transcribe,
-            fg="white", font=("Helvetica", 13),
-        )
-        self._btn_transcribe.pack(side=tk.LEFT, padx=4)
-
         self._status = tk.Label(self, text="Ready", font=("Helvetica", 11), fg="gray")
         self._status.pack(pady=(0, 8))
 
@@ -120,62 +114,64 @@ class App(tk.Tk):
     # ── button handlers ───────────────────────────────────────────────────────
 
     def _on_start(self):
-        if self._wav_path and os.path.exists(self._wav_path):
-            os.unlink(self._wav_path)
-            self._wav_path = None
         self._set_state("recording")
+        self._live_stop = threading.Event()
         try:
             self._recorder.start()
+            threading.Thread(target=self._live_loop, args=(self._live_stop,), daemon=True).start()
         except Exception as e:
             self._set_error(str(e))
 
     def _on_stop(self):
-        self._set_state("idle")
-        try:
-            self._recorder.stop()
-            self._set_state("stopped")
-        except Exception as e:
-            self._set_error(str(e))
+        self._set_state("finalizing")
+        self._recorder.stop()
+        self._live_stop.set()
 
-    def _on_transcribe(self):
-        self._set_state("transcribing")
-        threading.Thread(target=self._transcribe_async, daemon=True).start()
-
-    # ── background transcription ──────────────────────────────────────────────
-
-    def _transcribe_async(self):
-        wav_path, self._wav_path = self._wav_path, None
-        try:
-            audio, sr = sf.read(wav_path)
-            os.unlink(wav_path)
-            wav_path = None  # marked cleaned up
-            if len(audio) / sr < 0.5:
-                self.after(0, self._set_error, "No audio captured")
-                return
-            for text in self._transcriber.transcribe_segments(audio.astype(np.float32), sr):
+    def _live_loop(self, stop_event: threading.Event):
+        chunk_samples = LIVE_CHUNK_SECONDS * self._recorder.sample_rate
+        processed = 0
+        while not stop_event.is_set():
+            with self._recorder._lock:
+                all_audio = (
+                    np.concatenate(self._recorder._buffer)
+                    if self._recorder._buffer
+                    else np.zeros(0, dtype=np.float32)
+                )
+            if len(all_audio) - processed >= chunk_samples:
+                chunk = all_audio[processed : processed + chunk_samples].astype(np.float32)
+                processed += chunk_samples
+                for text in self._transcriber.transcribe_segments(chunk, self._recorder.sample_rate):
+                    self.after(0, self._append_text, text)
+            else:
+                stop_event.wait(timeout=0.5)
+        # Transcribe tail after stop
+        with self._recorder._lock:
+            all_audio = (
+                np.concatenate(self._recorder._buffer)
+                if self._recorder._buffer
+                else np.zeros(0, dtype=np.float32)
+            )
+        remaining = all_audio[processed:].astype(np.float32)
+        if len(remaining) / self._recorder.sample_rate >= 0.5:
+            for text in self._transcriber.transcribe_segments(remaining, self._recorder.sample_rate):
                 self.after(0, self._append_text, text)
-            self.after(0, self._set_state, "done")
-        except Exception as e:
-            if wav_path and os.path.exists(wav_path):
-                os.unlink(wav_path)
-            self.after(0, self._set_error, str(e))
+        self.after(0, self._set_state, "done")
 
     # ── GUI helpers ───────────────────────────────────────────────────────────
 
     _STATES = {
-        #              start               stop                transcribe          status label
-        "idle":        [(True,  "#4CAF50"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Ready",                              "gray")],
-        "recording":   [(False, "#9E9E9E"), (True,  "#f44336"), (False, "#9E9E9E"), ("Recording…",                   "red")],
-        "stopped":     [(True,  "#FF9800"), (False, "#9E9E9E"), (True,  "#2196F3"), ("Audio captured — press Transcribe", "#2196F3")],
-        "transcribing":[(False, "#9E9E9E"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Transcribing…",                "orange")],
-        "done":        [(True,  "#4CAF50"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Done",                               "green")],
+        #              start               stop                status label
+        "idle":       [(True,  "#4CAF50"), (False, "#9E9E9E"), ("Ready",      "gray")],
+        "recording":  [(False, "#9E9E9E"), (True,  "#f44336"), ("Recording…", "red")],
+        "finalizing": [(False, "#9E9E9E"), (False, "#9E9E9E"), ("Finishing…", "orange")],
+        "done":       [(True,  "#4CAF50"), (False, "#9E9E9E"), ("Done",       "green")],
     }
 
     def _set_state(self, state: str):
-        s_start, s_stop, s_trans, (label, fg) = self._STATES[state]
+        s_start, s_stop, (label, fg) = self._STATES[state]
         for btn, (enabled, bg) in zip(
-            [self._btn_start, self._btn_stop, self._btn_transcribe],
-            [s_start, s_stop, s_trans],
+            [self._btn_start, self._btn_stop],
+            [s_start, s_stop],
         ):
             btn.config(state=tk.NORMAL if enabled else tk.DISABLED, bg=bg)
         self._status.config(text=label, fg=fg)
