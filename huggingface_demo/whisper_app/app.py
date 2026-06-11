@@ -100,8 +100,8 @@ class App(tk.Tk):
             self._set_error(str(e))
 
     def _stop_recording(self):
-        self._recording = False
         self._btn.config(state=tk.DISABLED)
+        self._recording = False
         self._status.config(text="Transcribing…", fg="orange")
         threading.Thread(target=self._transcribe_async, daemon=True).start()
 
