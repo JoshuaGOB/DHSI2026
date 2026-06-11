@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import threading
 import tempfile
 import tkinter as tk
@@ -8,6 +9,17 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 import mlx_whisper
+
+
+def _ensure_offline(cache_dir: Path = None) -> None:
+    if cache_dir is None:
+        cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+    if cache_dir.exists() and any(
+        d.name.startswith("models--mlx-community--whisper-large-v3-turbo")
+        for d in cache_dir.iterdir()
+        if d.is_dir()
+    ):
+        os.environ["HF_HUB_OFFLINE"] = "1"
 
 
 class AudioRecorder:
