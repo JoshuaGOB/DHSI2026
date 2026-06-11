@@ -38,6 +38,7 @@ async function loadCollections() {
 }
 
 async function selectCollection(id, li) {
+  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; $("ingest-btn").disabled = false; }
   state.collectionId = id;
   document.querySelectorAll("#collections li").forEach((el) => el.classList.remove("active"));
   li.classList.add("active");
@@ -46,16 +47,20 @@ async function selectCollection(id, li) {
 }
 
 async function loadPapers() {
-  const papers = await api(`/collections/${state.collectionId}/papers`);
-  const ul = $("papers");
-  ul.innerHTML = papers.length ? "" : '<li class="muted">No papers yet — ingest first.</li>';
-  papers.forEach((p) => {
-    const li = document.createElement("li");
-    li.innerHTML = `${p.title} <span class="badge ${p.ingest_status}">${p.ingest_status}</span>`;
-    if (p.ingest_error) li.title = p.ingest_error;
-    li.onclick = () => selectPaper(p, li);
-    ul.appendChild(li);
-  });
+  try {
+    const papers = await api(`/collections/${state.collectionId}/papers`);
+    const ul = $("papers");
+    ul.innerHTML = papers.length ? "" : '<li class="muted">No papers yet — ingest first.</li>';
+    papers.forEach((p) => {
+      const li = document.createElement("li");
+      li.innerHTML = `${p.title} <span class="badge ${p.ingest_status}">${p.ingest_status}</span>`;
+      if (p.ingest_error) li.title = p.ingest_error;
+      li.onclick = () => selectPaper(p, li);
+      ul.appendChild(li);
+    });
+  } catch (err) {
+    setStatus(`Could not load papers: ${err.message}`, true);
+  }
 }
 
 // --- Ingest with job polling ----------------------------------------------
