@@ -208,8 +208,11 @@ class App(tk.Tk):
         if not path:
             return
         content = self._text.get("1.0", tk.END)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        except OSError as e:
+            self._status.config(text=f"Save failed: {e}", fg="red")
 
     def _append_text(self, text: str):
         self._text.config(state=tk.NORMAL)
