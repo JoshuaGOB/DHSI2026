@@ -70,3 +70,52 @@ def test_derived_paths(tmp_path):
     assert s.db_path == tmp_path / "zotcite.db"
     assert s.pdf_dir == tmp_path / "pdfs"
     assert s.chroma_dir == tmp_path / "chroma"
+
+
+def test_ollama_embedding_provider_default_model():
+    env = BASE_ENV | {"EMBEDDING_PROVIDER": "ollama"}
+    s = load_settings(env=env)
+    assert s.embedding_provider == "ollama"
+    assert s.embedding_model == "nomic-embed-text"
+    assert s.ollama_base_url == "http://localhost:11434"
+
+
+def test_embedding_provider_defaults_to_openai():
+    s = load_settings(env=BASE_ENV)
+    assert s.embedding_provider == "openai"
+
+
+def test_fully_local_needs_no_api_keys():
+    env = {
+        "ZOTERO_USER_ID": "1",
+        "ZOTERO_API_KEY": "z",
+        "LLM_PROVIDER": "ollama",
+        "EMBEDDING_PROVIDER": "ollama",
+    }
+    s = load_settings(env=env)
+    assert s.llm_provider == "ollama"
+    assert s.llm_model == "llama3.1"
+    assert s.openai_api_key is None
+
+
+def test_openai_key_required_when_only_embeddings_use_openai():
+    env = {
+        "ZOTERO_USER_ID": "1",
+        "ZOTERO_API_KEY": "z",
+        "LLM_PROVIDER": "ollama",
+        "EMBEDDING_PROVIDER": "openai",
+    }
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        load_settings(env=env)
+
+
+def test_invalid_embedding_provider_rejected():
+    env = BASE_ENV | {"EMBEDDING_PROVIDER": "gemini"}
+    with pytest.raises(ValueError, match="EMBEDDING_PROVIDER"):
+        load_settings(env=env)
+
+
+def test_ollama_base_url_override():
+    env = BASE_ENV | {"OLLAMA_BASE_URL": "http://host.docker.internal:11434"}
+    s = load_settings(env=env)
+    assert s.ollama_base_url == "http://host.docker.internal:11434"

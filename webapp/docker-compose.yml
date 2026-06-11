@@ -10,6 +10,10 @@ services:
       DATA_DIR: /app/data
     volumes:
       - ./data:/app/data
+    # lets the container reach Ollama on the host (set OLLAMA_BASE_URL to
+    # http://host.docker.internal:11434 in .env); no-op on Docker Desktop
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - chroma
 

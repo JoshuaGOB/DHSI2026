@@ -20,6 +20,26 @@ Open http://localhost:8000.
 
 Without CHROMA_HOST set, Chroma runs embedded and persists to `data/chroma/`.
 
+## Fully local models (Ollama, no API keys)
+
+Both the chat model and embeddings can run locally via [Ollama](https://ollama.com)
+instead of OpenAI/Anthropic:
+
+    ollama pull nomic-embed-text   # embeddings (~270 MB)
+    ollama pull llama3.1           # chat (or any chat model you prefer)
+
+In `.env`:
+
+    LLM_PROVIDER=ollama
+    EMBEDDING_PROVIDER=ollama
+    #LLM_MODEL=llama3.1            # override to a model you've pulled
+
+No OPENAI_API_KEY or ANTHROPIC_API_KEY needed in this mode. When running with
+Docker, also set `OLLAMA_BASE_URL=http://host.docker.internal:11434` so the
+container can reach Ollama on your machine. Providers can be mixed (e.g.
+Anthropic chat + Ollama embeddings). Changing the embedding model marks
+already-indexed papers for re-ingest automatically on the next ingest run.
+
 ## Tests
 
     .venv/bin/python -m pytest

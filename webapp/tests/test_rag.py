@@ -128,3 +128,10 @@ def test_answer_query_no_indexed_papers_raises(settings, chroma_client, fake_emb
             "anything?", "EMPTY", settings,
             llm=FakeLLM("x"), chroma_client=chroma_client, embeddings=fake_embeddings,
         )
+
+
+def test_get_chat_model_ollama_provider(settings):
+    settings.llm_provider = "ollama"
+    settings.llm_model = "llama3.1"
+    llm = rag.get_chat_model(settings)
+    assert type(llm).__name__ == "ChatOllama"

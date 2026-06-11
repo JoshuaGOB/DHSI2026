@@ -53,3 +53,16 @@ def test_index_paper_is_idempotent(
     second = ingest.index_paper(paper, settings, chroma_client, fake_embeddings)
     assert first == second
     assert chroma_client.get_collection("paper_KEY1").count() == second
+
+
+class TestGetEmbeddings:
+    def test_openai_provider(self, settings):
+        emb = ingest.get_embeddings(settings)
+        assert type(emb).__name__ == "OpenAIEmbeddings"
+
+    def test_ollama_provider(self, settings):
+        settings.embedding_provider = "ollama"
+        settings.embedding_model = "nomic-embed-text"
+        emb = ingest.get_embeddings(settings)
+        assert type(emb).__name__ == "OllamaEmbeddings"
+        assert emb.base_url == settings.ollama_base_url

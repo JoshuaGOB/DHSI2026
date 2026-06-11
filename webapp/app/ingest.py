@@ -1,6 +1,7 @@
 """PDF → chunks → embeddings → Chroma, plus the ingest job runner."""
 import chromadb
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -18,6 +19,10 @@ def get_chroma_client(settings: Settings):
 
 
 def get_embeddings(settings: Settings):
+    if settings.embedding_provider == "ollama":
+        return OllamaEmbeddings(
+            model=settings.embedding_model, base_url=settings.ollama_base_url
+        )
     return OpenAIEmbeddings(
         model=settings.embedding_model, api_key=settings.openai_api_key
     )

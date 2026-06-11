@@ -52,9 +52,12 @@ Using a real Zotero collection of 3–10 papers:
 **Stack:** Python backend (FastAPI), LangChain for the RAG plumbing
 (loaders, splitter, embeddings, retriever, chains), ChromaDB as the vector
 store, SQLite for app metadata, vanilla HTML/JS frontend (no build step).
-The chat LLM is OpenAI or Anthropic, configured by env var. Embeddings
-come from OpenAI (Anthropic has no embeddings API; if the Anthropic LLM is
-chosen, embeddings still use OpenAI — so an OpenAI key is always required).
+The chat LLM is OpenAI, Anthropic, or Ollama (local), configured by env var.
+Embeddings come from OpenAI or Ollama (local), configured independently
+(Anthropic has no embeddings API). An OpenAI key is required only when
+either provider is set to `openai`; a fully-Ollama configuration needs no
+API keys at all. *(Amended 2026-06-11: original design required OpenAI for
+embeddings; Ollama support added so no paid signup is needed.)*
 
 **Runtime data flow:**
 Browser → FastAPI → (Zotero Web API | Chroma via LangChain | LLM API) → Browser.
@@ -129,10 +132,15 @@ All via `.env`, loaded by the backend (and passed into containers by
 docker compose):
 
 - `ZOTERO_USER_ID`, `ZOTERO_API_KEY` — Zotero Web API credentials.
-- `LLM_PROVIDER` — `openai` or `anthropic` (chat model only).
-- `OPENAI_API_KEY` — always required (embeddings, and chat if provider is
-  openai). `ANTHROPIC_API_KEY` — required only if provider is anthropic.
-- `LLM_MODEL`, `EMBEDDING_MODEL` — model names with sensible defaults.
+- `LLM_PROVIDER` — `openai`, `anthropic`, or `ollama` (chat model only).
+- `EMBEDDING_PROVIDER` — `openai` or `ollama` (default openai).
+- `OPENAI_API_KEY` — required when either provider is `openai`.
+  `ANTHROPIC_API_KEY` — required only if the chat provider is anthropic.
+  No keys needed when both providers are `ollama`.
+- `OLLAMA_BASE_URL` — Ollama endpoint (default `http://localhost:11434`;
+  use `http://host.docker.internal:11434` from docker).
+- `LLM_MODEL`, `EMBEDDING_MODEL` — model names with sensible per-provider
+  defaults (ollama: `llama3.1` / `nomic-embed-text`).
 - `CHUNK_SIZE` (default 1000), `CHUNK_OVERLAP` (default 200),
   `RETRIEVAL_K` (default 8).
 

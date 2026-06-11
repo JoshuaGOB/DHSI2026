@@ -2,6 +2,7 @@
 import re
 
 from langchain_anthropic import ChatAnthropic
+from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from . import db
@@ -41,6 +42,8 @@ def get_chat_model(settings: Settings):
             api_key=settings.anthropic_api_key,
             max_tokens=4096,
         )
+    if settings.llm_provider == "ollama":
+        return ChatOllama(model=settings.llm_model, base_url=settings.ollama_base_url)
     return ChatOpenAI(model=settings.llm_model, api_key=settings.openai_api_key)
 
 
