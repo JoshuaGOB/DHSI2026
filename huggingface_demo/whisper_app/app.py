@@ -78,20 +78,35 @@ class WhisperTranscriber:
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Whisper Test")
+        self.title("Whisper")
         self.resizable(False, False)
 
         self._recorder = AudioRecorder()
         self._transcriber = WhisperTranscriber()
-        self._recording = False
+        self._wav_path: str | None = None
 
-        self._btn = tk.Button(
-            self, text="Record", width=20, command=self._toggle,
-            bg="#4CAF50", fg="white", font=("Helvetica", 14),
+        btn_row = tk.Frame(self)
+        btn_row.pack(pady=(16, 8), padx=24)
+
+        self._btn_start = tk.Button(
+            btn_row, text="Start", width=10, command=self._on_start,
+            fg="white", font=("Helvetica", 13),
         )
-        self._btn.pack(pady=(16, 8), padx=24)
+        self._btn_start.pack(side=tk.LEFT, padx=4)
 
-        self._status = tk.Label(self, text="Idle", font=("Helvetica", 11), fg="gray")
+        self._btn_stop = tk.Button(
+            btn_row, text="Stop", width=10, command=self._on_stop,
+            fg="white", font=("Helvetica", 13),
+        )
+        self._btn_stop.pack(side=tk.LEFT, padx=4)
+
+        self._btn_transcribe = tk.Button(
+            btn_row, text="Transcribe", width=10, command=self._on_transcribe,
+            fg="white", font=("Helvetica", 13),
+        )
+        self._btn_transcribe.pack(side=tk.LEFT, padx=4)
+
+        self._status = tk.Label(self, text="Ready", font=("Helvetica", 11), fg="gray")
         self._status.pack(pady=(0, 8))
 
         self._text = scrolledtext.ScrolledText(
@@ -100,41 +115,70 @@ class App(tk.Tk):
         )
         self._text.pack(padx=16, pady=(0, 16))
 
-    def _toggle(self):
-        if not self._recording:
-            self._start_recording()
-        else:
-            self._stop_recording()
+        self._set_state("idle")
 
-    def _start_recording(self):
-        self._recording = True
-        self._btn.config(text="Stop", bg="#f44336")
-        self._status.config(text="Recording…", fg="red")
+    # ── button handlers ───────────────────────────────────────────────────────
+
+    def _on_start(self):
+        if self._wav_path and os.path.exists(self._wav_path):
+            os.unlink(self._wav_path)
+            self._wav_path = None
+        self._set_state("recording")
         try:
             self._recorder.start()
         except Exception as e:
             self._set_error(str(e))
 
-    def _stop_recording(self):
-        self._btn.config(state=tk.DISABLED)
-        self._recording = False
-        self._status.config(text="Transcribing…", fg="orange")
+    def _on_stop(self):
+        self._set_state("idle")  # disable all buttons while WAV is being written
+        try:
+            self._wav_path = self._recorder.stop()
+            self._set_state("stopped")
+        except Exception as e:
+            self._set_error(str(e))
+
+    def _on_transcribe(self):
+        self._set_state("transcribing")
         threading.Thread(target=self._transcribe_async, daemon=True).start()
 
+    # ── background transcription ──────────────────────────────────────────────
+
     def _transcribe_async(self):
+        wav_path, self._wav_path = self._wav_path, None
         try:
-            wav_path = self._recorder.stop()
-            # Guard: reject recordings shorter than 0.5 seconds
-            data, sr = sf.read(wav_path)
-            if len(data) / sr < 0.5:
-                os.unlink(wav_path)
+            audio, sr = sf.read(wav_path)
+            os.unlink(wav_path)
+            wav_path = None  # marked cleaned up
+            if len(audio) / sr < 0.5:
                 self.after(0, self._set_error, "No audio captured")
                 return
-            text = self._transcriber.transcribe(wav_path)
-            self.after(0, self._append_text, text)
-            self.after(0, self._set_idle)
+            for text in self._transcriber.transcribe_segments(audio.astype(np.float32), sr):
+                self.after(0, self._append_text, text)
+            self.after(0, self._set_state, "done")
         except Exception as e:
+            if wav_path and os.path.exists(wav_path):
+                os.unlink(wav_path)
             self.after(0, self._set_error, str(e))
+
+    # ── GUI helpers ───────────────────────────────────────────────────────────
+
+    _STATES = {
+        #              start               stop                transcribe          status label
+        "idle":        [(True,  "#4CAF50"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Ready",                              "gray")],
+        "recording":   [(False, "#9E9E9E"), (True,  "#f44336"), (False, "#9E9E9E"), ("Recording…",                   "red")],
+        "stopped":     [(True,  "#FF9800"), (False, "#9E9E9E"), (True,  "#2196F3"), ("Audio captured — press Transcribe", "#2196F3")],
+        "transcribing":[(False, "#9E9E9E"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Transcribing…",                "orange")],
+        "done":        [(True,  "#4CAF50"), (False, "#9E9E9E"), (False, "#9E9E9E"), ("Done",                               "green")],
+    }
+
+    def _set_state(self, state: str):
+        s_start, s_stop, s_trans, (label, fg) = self._STATES[state]
+        for btn, (enabled, bg) in zip(
+            [self._btn_start, self._btn_stop, self._btn_transcribe],
+            [s_start, s_stop, s_trans],
+        ):
+            btn.config(state=tk.NORMAL if enabled else tk.DISABLED, bg=bg)
+        self._status.config(text=label, fg=fg)
 
     def _append_text(self, text: str):
         self._text.config(state=tk.NORMAL)
@@ -143,15 +187,11 @@ class App(tk.Tk):
         self._text.config(state=tk.DISABLED)
         self._text.see(tk.END)
 
-    def _set_idle(self):
-        self._btn.config(text="Record", bg="#4CAF50", state=tk.NORMAL)
-        self._status.config(text="Done", fg="green")
-
     def _set_error(self, msg: str):
-        self._btn.config(text="Record", bg="#4CAF50", state=tk.NORMAL)
         self._status.config(text=f"Error: {msg}", fg="red")
-        self._recording = False
+        self._set_state("idle")
 
 
 if __name__ == "__main__":
+    _ensure_offline()
     App().mainloop()
