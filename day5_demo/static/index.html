@@ -23,10 +23,66 @@
     html, body { height: 100%; overflow: hidden; background: var(--parchment); }
     #map { position: absolute; inset: 0; z-index: 0; }
     .leaflet-control-attribution { font-family: sans-serif; font-size: 10px; }
+    #search-btn.loading { opacity: 0.4; cursor: default; }
+    #search-btn.loading::after { content: '…'; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+
+  <!-- Command Bar -->
+  <div id="command-bar" style="
+    position:absolute; top:16px; left:50%; transform:translateX(-50%);
+    z-index:1000; width:min(580px,90vw);
+    background:rgba(255,252,245,0.97);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:0 4px 20px rgba(80,50,20,0.16);
+    padding:10px 14px;
+    font-family:Georgia,serif;
+  ">
+    <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;
+                color:var(--text-lt);margin-bottom:6px;">
+      ⌖ Archive Query
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input id="query-input" type="text"
+        placeholder="Search newspapers… (e.g. abolition, Cuba, 1872)"
+        style="flex:1;border:none;background:transparent;
+               font-family:Georgia,serif;font-size:13px;
+               color:var(--text-dk);outline:none;"
+      />
+      <button id="search-btn"
+        style="background:none;border:none;cursor:pointer;
+               font-size:14px;color:var(--gold);padding:0 4px;"
+        title="Search (Enter)">↵</button>
+    </div>
+    <!-- Date slider -->
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+      <div style="display:flex;justify-content:space-between;
+                  font-size:10px;color:var(--text-lt);margin-bottom:4px;">
+        <span>Date range</span>
+        <span id="year-label" style="color:var(--gold);font-weight:bold;">1865 – 1878</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input id="year-min" type="range" min="1860" max="1880" value="1865"
+          style="flex:1;accent-color:var(--pin-red);" />
+        <input id="year-max" type="range" min="1860" max="1880" value="1878"
+          style="flex:1;accent-color:var(--pin-red);" />
+      </div>
+    </div>
+    <!-- View toggle -->
+    <div style="margin-top:8px;display:flex;justify-content:flex-end;">
+      <button id="view-toggle"
+        title="Switch between city of publication and geographic subject of articles"
+        style="font-family:Georgia,serif;font-size:11px;
+               color:var(--text-mid);background:var(--parchment-dk);
+               border:1px solid var(--border);border-radius:4px;
+               padding:3px 10px;cursor:pointer;">
+        📍 Published In
+      </button>
+    </div>
+  </div>
 
   <script>
     const map = L.map('map', { center: [18, -45], zoom: 3, zoomControl: true });
@@ -40,6 +96,17 @@
         maxZoom: 18,
       }
     ).addTo(map);
+
+    // Date slider (cosmetic — updates label only)
+    function updateYearLabel() {
+      const minVal = parseInt(document.getElementById('year-min').value);
+      const maxVal = parseInt(document.getElementById('year-max').value);
+      const lo = Math.min(minVal, maxVal);
+      const hi = Math.max(minVal, maxVal);
+      document.getElementById('year-label').textContent = `${lo} – ${hi}`;
+    }
+    document.getElementById('year-min').addEventListener('input', updateYearLabel);
+    document.getElementById('year-max').addEventListener('input', updateYearLabel);
   </script>
 </body>
 </html>
