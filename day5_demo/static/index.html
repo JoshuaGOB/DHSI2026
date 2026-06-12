@@ -362,6 +362,103 @@
     map.on('click', () => {
       document.getElementById('cluster-card').style.display = 'none';
     });
+
+    // ── Tag filtering (cosmetic) ──────────────────────────────────
+    function filterByTag(tag) {
+      document.getElementById('query-input').value = tag;
+      runSearch();
+    }
+
+    // ── Reprojected viewport toggle (cosmetic) ────────────────────
+    const DISCUSSES_RESULTS = [
+      {
+        id: 'la_america_ilustrada',
+        newspaper: 'La América Ilustrada',
+        city: 'New York (published)',
+        lat: 40.7128, lng: -74.0060,
+        language: 'Spanish',
+        editor: 'Juan Ignacio de Armas y Céspedes',
+        years_active: '1872–1873',
+        issues_digitised: 85,
+        archive_url: 'https://chroniclingamerica.loc.gov',
+        sample_article: {
+          title: 'La Guerra de Cuba',
+          date: '1872-01-15',
+          type: 'article',
+          topics: ['Cuba', 'Spain', 'War', 'Abolition'],
+          notes: 'Published in New York. This pin shows the city of publication.',
+        },
+      },
+      {
+        id: 'la_america_ilustrada_cuba',
+        newspaper: 'La América Ilustrada',
+        city: 'Havana (subject)',
+        lat: 23.1352, lng: -82.3589,
+        language: 'Spanish',
+        editor: 'Juan Ignacio de Armas y Céspedes',
+        years_active: '1872–1873',
+        issues_digitised: 85,
+        archive_url: 'https://chroniclingamerica.loc.gov',
+        sample_article: {
+          title: 'La Guerra de Cuba',
+          date: '1872-01-15',
+          type: 'article',
+          topics: ['Cuba', 'Spain', 'War', 'Abolition'],
+          notes: 'Published in New York, this article discusses Cuba — shown here as a subject pin.',
+        },
+      },
+      {
+        id: 'o_novo_mundo',
+        newspaper: 'O Novo Mundo',
+        city: 'New York (published)',
+        lat: 40.7200, lng: -74.0060,
+        language: 'Portuguese',
+        editor: 'José Carlos Rodrigues',
+        years_active: '1870–1879',
+        issues_digitised: 150,
+        archive_url: 'https://bndigital.bn.gov.br',
+        sample_article: {
+          title: 'A Emancipação dos Escravos',
+          date: '1870-10-24',
+          type: 'article',
+          topics: ['Abolition', 'Legislation', 'Emperor', 'Brazil'],
+          notes: 'Published in New York. This pin shows the city of publication.',
+        },
+      },
+      {
+        id: 'o_novo_mundo_brazil',
+        newspaper: 'O Novo Mundo',
+        city: 'Rio de Janeiro (subject)',
+        lat: -22.9068, lng: -43.1729,
+        language: 'Portuguese',
+        editor: 'José Carlos Rodrigues',
+        years_active: '1870–1879',
+        issues_digitised: 150,
+        archive_url: 'https://bndigital.bn.gov.br',
+        sample_article: {
+          title: 'A Emancipação dos Escravos',
+          date: '1870-10-24',
+          type: 'article',
+          topics: ['Abolition', 'Legislation', 'Emperor', 'Brazil'],
+          notes: 'Published in New York, O Novo Mundo covered Brazilian abolition debates. Shown here as a subject pin.',
+        },
+      },
+    ];
+
+    document.getElementById('view-toggle').addEventListener('click', () => {
+      if (!currentResults.length) return;
+      if (viewMode === 'published') {
+        viewMode = 'discusses';
+        document.getElementById('view-toggle').textContent = '🗺 Discusses';
+        dropPins(DISCUSSES_RESULTS);
+        map.flyTo([10, -55], 3, { duration: 1.2 });
+      } else {
+        viewMode = 'published';
+        document.getElementById('view-toggle').textContent = '📍 Published In';
+        dropPins(currentResults);
+        map.flyTo([18, -45], 3, { duration: 1.2 });
+      }
+    });
   </script>
 </body>
 </html>
