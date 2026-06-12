@@ -107,6 +107,105 @@
     }
     document.getElementById('year-min').addEventListener('input', updateYearLabel);
     document.getElementById('year-max').addEventListener('input', updateYearLabel);
+
+    // ── Pin management ────────────────────────────────────────────
+    let activeLayers = [];
+
+    function clearPins() {
+      activeLayers.forEach(l => map.removeLayer(l));
+      activeLayers = [];
+    }
+
+    function makePin(color) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="width:14px;height:14px;background:${color};
+                 border-radius:50%;border:2.5px solid #fff8f0;
+                 box-shadow:0 1px 6px rgba(0,0,0,0.35);cursor:pointer;"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+    }
+
+    function makeClusterPin(count) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="position:relative;width:22px;height:22px;">
+          <div style="width:14px;height:14px;background:#8b3a3a;
+               border-radius:50%;border:2.5px solid #fff8f0;
+               box-shadow:0 1px 6px rgba(0,0,0,0.35);"></div>
+          <div style="position:absolute;top:-5px;right:-5px;
+               background:#8b6914;color:#fff;font-size:9px;font-family:sans-serif;
+               font-weight:bold;width:14px;height:14px;border-radius:50%;
+               display:flex;align-items:center;justify-content:center;">${count}</div>
+        </div>`,
+        iconSize: [22, 22],
+        iconAnchor: [7, 7],
+      });
+    }
+
+    function groupByCity(results) {
+      const groups = new Map();
+      for (const pub of results) {
+        if (!groups.has(pub.city)) groups.set(pub.city, []);
+        groups.get(pub.city).push(pub);
+      }
+      return groups;
+    }
+
+    function dropPins(results) {
+      clearPins();
+      const groups = groupByCity(results);
+      for (const [city, pubs] of groups) {
+        const { lat, lng } = pubs[0];
+        const isCluster = pubs.length > 1;
+        const icon = isCluster ? makeClusterPin(pubs.length) : makePin('#8b3a3a');
+        const marker = L.marker([lat, lng], { icon }).addTo(map);
+        activeLayers.push(marker);
+
+        if (isCluster) {
+          marker.on('click', () => openClusterCard(pubs, marker));
+        } else {
+          marker.on('click', () => openPanel(pubs[0]));
+        }
+      }
+    }
+
+    // ── Search ────────────────────────────────────────────────────
+    let currentResults = [];
+    let viewMode = 'published';
+
+    async function runSearch() {
+      const query = document.getElementById('query-input').value.trim();
+      if (!query) return;
+
+      const btn = document.getElementById('search-btn');
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.textContent = '';
+
+      try {
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+        const data = await res.json();
+        currentResults = data;
+        viewMode = 'published';
+        document.getElementById('view-toggle').textContent = '📍 Published In';
+        dropPins(data);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.textContent = '↵';
+      }
+    }
+
+    document.getElementById('search-btn').addEventListener('click', runSearch);
+    document.getElementById('query-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') runSearch();
+    });
   </script>
 </body>
 </html>
